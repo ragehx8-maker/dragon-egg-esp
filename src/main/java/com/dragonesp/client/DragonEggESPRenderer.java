@@ -1,13 +1,9 @@
 package com.dragonesp.client;
 
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.Tesselator;
-import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.RenderPhase;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.util.math.MatrixStack;
@@ -29,7 +25,7 @@ public class DragonEggESPRenderer {
 
         World world = client.world;
         BlockPos center = client.player.getBlockPos();
-        Vec3d camPos = client.gameRenderer.getCamera().getPos();
+        Vec3d camPos = client.gameRenderer.getCamera().getCameraPos();
 
         int minX = center.getX() - HORIZONTAL_RADIUS;
         int maxX = center.getX() + HORIZONTAL_RADIUS;
@@ -40,7 +36,7 @@ public class DragonEggESPRenderer {
         int maxY = Math.min(world.getTopY(Heightmap.Type.WORLD_SURFACE, center.getX(), center.getZ()) + VERTICAL_RADIUS, 320);
 
         VertexConsumerProvider.Immediate consumers = client.getBufferBuilders().getEntityVertexConsumers();
-        VertexConsumer buffer = consumers.getBuffer(RenderLayer.getLines());
+        VertexConsumer buffer = consumers.getBuffer(RenderPhase.LINES);
 
         matrices.push();
         matrices.translate(-camPos.x, -camPos.y, -camPos.z);
@@ -60,7 +56,7 @@ public class DragonEggESPRenderer {
         }
 
         matrices.pop();
-        consumers.draw(RenderLayer.getLines());
+        consumers.draw(RenderPhase.LINES);
     }
 
     private static void drawBoxOutline(
