@@ -14,7 +14,6 @@ public class GameRendererMixin {
 
     @Inject(method = "render", at = @At("TAIL"), require = 0)
     private void dragonesp$onRender(RenderTickCounter tickCounter, boolean tick, CallbackInfo ci) {
-        float tickDelta = tickCounter != null ? tickCounter.getTickProgress(true) : 0.0f;
-        DragonEggESPRenderer.render(new MatrixStack(), tickDelta);
+        DragonEggESPRenderer.render(new MatrixStack(), 0.0f);
     }
 }
