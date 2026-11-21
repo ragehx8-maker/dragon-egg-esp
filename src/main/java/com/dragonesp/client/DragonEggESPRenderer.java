@@ -3,7 +3,7 @@ package com.dragonesp.client;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.RenderPhase;
+import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.util.math.MatrixStack;
@@ -36,7 +36,7 @@ public class DragonEggESPRenderer {
         int maxY = Math.min(world.getTopY(Heightmap.Type.WORLD_SURFACE, center.getX(), center.getZ()) + VERTICAL_RADIUS, 320);
 
         VertexConsumerProvider.Immediate consumers = client.getBufferBuilders().getEntityVertexConsumers();
-        VertexConsumer buffer = consumers.getBuffer(RenderPhase.LINES);
+        VertexConsumer buffer = consumers.getBuffer(RenderLayer.getDebugLineStrip());
 
         matrices.push();
         matrices.translate(-camPos.x, -camPos.y, -camPos.z);
@@ -56,7 +56,7 @@ public class DragonEggESPRenderer {
         }
 
         matrices.pop();
-        consumers.draw(RenderPhase.LINES);
+        consumers.draw();
     }
 
     private static void drawBoxOutline(
@@ -78,19 +78,16 @@ public class DragonEggESPRenderer {
         double maxY = box.maxY;
         double maxZ = box.maxZ;
 
-        // Bottom 4 edges
         line(entry, consumer, minX, minY, minZ, maxX, minY, minZ, red, green, blue, alpha);
         line(entry, consumer, maxX, minY, minZ, maxX, minY, maxZ, red, green, blue, alpha);
         line(entry, consumer, maxX, minY, maxZ, minX, minY, maxZ, red, green, blue, alpha);
         line(entry, consumer, minX, minY, maxZ, minX, minY, minZ, red, green, blue, alpha);
 
-        // Top 4 edges
         line(entry, consumer, minX, maxY, minZ, maxX, maxY, minZ, red, green, blue, alpha);
         line(entry, consumer, maxX, maxY, minZ, maxX, maxY, maxZ, red, green, blue, alpha);
         line(entry, consumer, maxX, maxY, maxZ, minX, maxY, maxZ, red, green, blue, alpha);
         line(entry, consumer, minX, maxY, maxZ, minX, maxY, minZ, red, green, blue, alpha);
 
-        // 4 vertical edges
         line(entry, consumer, minX, minY, minZ, minX, maxY, minZ, red, green, blue, alpha);
         line(entry, consumer, maxX, minY, minZ, maxX, maxY, minZ, red, green, blue, alpha);
         line(entry, consumer, maxX, minY, maxZ, maxX, maxY, maxZ, red, green, blue, alpha);
