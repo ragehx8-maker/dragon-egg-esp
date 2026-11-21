@@ -1,230 +1,126 @@
 package com.dragonesp.client;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.Tesselator;
+import com.mojang.blaze3d.vertex.VertexFormat;
+import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.*;
+import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.entity.Entity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.Heightmap;
 import net.minecraft.world.World;
-import org.joml.Matrix4f;
-
-import java.util.ArrayList;
-import java.util.List;
 
 public class DragonEggESPRenderer {
+    private static final int HORIZONTAL_RADIUS = 32;
+    private static final int VERTICAL_RADIUS = 32;
 
-    // ESP Colors - bright magenta/purple for Dragon Egg
-    private static final float R = 0.85f;
-    private static final float G = 0.0f;
-    private static final float B = 1.0f;
-    private static final float ALPHA_BOX = 0.35f;
-    private static final float ALPHA_LINE = 1.0f;
-
-    // Tracer line color - bright cyan
-    private static final float TR = 0.0f;
-    private static final float TG = 1.0f;
-    private static final float TB = 1.0f;
-
-    // Max search radius
-    private static final int SEARCH_RADIUS = 128;
-
-    public static void render(WorldRenderContext context) {
+    public static void render(MatrixStack matrices, float tickDelta) {
         MinecraftClient client = MinecraftClient.getInstance();
-        if (client.world == null || client.player == null || client.gameRenderer == null) return;
+        if (client == null || client.player == null || client.world == null) {
+            return;
+        }
 
         World world = client.world;
-        Entity camera = client.getCameraEntity();
-        if (camera == null) return;
+        BlockPos center = client.player.getBlockPos();
+        Vec3d camPos = client.gameRenderer.getCamera().getPos();
 
-        // Find all dragon eggs in range
-        List<BlockPos> dragonEggs = findDragonEggs(world, client.player.getBlockPos());
-        if (dragonEggs.isEmpty()) return;
+        int minX = center.getX() - HORIZONTAL_RADIUS;
+        int maxX = center.getX() + HORIZONTAL_RADIUS;
+        int minZ = center.getZ() - HORIZONTAL_RADIUS;
+        int maxZ = center.getZ() + HORIZONTAL_RADIUS;
 
-        MatrixStack matrices = context.matrixStack();
-        Vec3d camPos = context.camera().getPos();
+        int minY = Math.max(world.getBottomY(), center.getY() - VERTICAL_RADIUS);
+        int maxY = Math.min(world.getTopY(Heightmap.Type.WORLD_SURFACE, center.getX(), center.getZ()) + VERTICAL_RADIUS, 320);
 
-        // Setup rendering
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.disableDepthTest();
-        RenderSystem.setShader(GameRenderer::getPositionColorProgram);
+        VertexConsumerProvider.Immediate consumers = client.getBufferBuilders().getEntityVertexConsumers();
+        VertexConsumer buffer = consumers.getBuffer(RenderLayer.getLines());
 
-        Tessellator tessellator = Tessellator.getInstance();
-        BufferBuilder buffer = tessellator.begin(VertexFormat.DrawMode.DEBUG_LINES, VertexFormats.POSITION_COLOR);
+        matrices.push();
+        matrices.translate(-camPos.x, -camPos.y, -camPos.z);
 
-        for (BlockPos eggPos : dragonEggs) {
-            // Offset from camera
-            double dx = eggPos.getX() - camPos.x;
-            double dy = eggPos.getY() - camPos.y;
-            double dz = eggPos.getZ() - camPos.z;
-
-            matrices.push();
-            matrices.translate(dx, dy, dz);
-
-            Matrix4f mat = matrices.peek().getPositionMatrix();
-
-            // Draw ESP bounding box
-            drawBox(buffer, mat, 0, 0, 0, 1, 1, 1, R, G, B, ALPHA_LINE);
-
-            matrices.pop();
-        }
-
-        // Draw tracer lines from screen center to each egg
-        for (BlockPos eggPos : dragonEggs) {
-            double dx = eggPos.getX() + 0.5 - camPos.x;
-            double dy = eggPos.getY() + 0.5 - camPos.y;
-            double dz = eggPos.getZ() + 0.5 - camPos.z;
-
-            matrices.push();
-            Matrix4f mat = matrices.peek().getPositionMatrix();
-
-            // Tracer: from (0,0,0) which is camera origin to egg center
-            // We offset by eye height for screen-center feel
-            float eyeY = (float)(client.player.getEyeY() - camPos.y);
-
-            buffer.vertex(mat, 0, eyeY, 0).color(TR, TG, TB, ALPHA_LINE);
-            buffer.vertex(mat, (float)dx, (float)dy, (float)dz).color(TR, TG, TB, ALPHA_LINE);
-
-            matrices.pop();
-        }
-
-        // End and draw
-        try {
-            BufferRenderer.drawWithGlobalProgram(buffer.end());
-        } catch (Exception e) {
-            // Buffer may be empty
-        }
-
-        // Now draw filled box (semi-transparent)
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-        RenderSystem.disableDepthTest();
-        RenderSystem.setShader(GameRenderer::getPositionColorProgram);
-
-        BufferBuilder fillBuffer = tessellator.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR);
-
-        for (BlockPos eggPos : dragonEggs) {
-            double dx = eggPos.getX() - camPos.x;
-            double dy = eggPos.getY() - camPos.y;
-            double dz = eggPos.getZ() - camPos.z;
-
-            matrices.push();
-            matrices.translate(dx, dy, dz);
-            Matrix4f mat = matrices.peek().getPositionMatrix();
-
-            drawFilledBox(fillBuffer, mat, 0.02f, 0.02f, 0.02f, 0.98f, 0.98f, 0.98f, R, G, B, ALPHA_BOX);
-
-            matrices.pop();
-        }
-
-        try {
-            BufferRenderer.drawWithGlobalProgram(fillBuffer.end());
-        } catch (Exception e) {
-            // empty
-        }
-
-        // Restore GL state
-        RenderSystem.enableDepthTest();
-        RenderSystem.disableBlend();
-    }
-
-    private static List<BlockPos> findDragonEggs(World world, BlockPos center) {
-        List<BlockPos> found = new ArrayList<>();
-        int minX = center.getX() - SEARCH_RADIUS;
-        int maxX = center.getX() + SEARCH_RADIUS;
-        int minY = Math.max(world.getBottomY(), center.getY() - SEARCH_RADIUS);
-        int maxY = Math.min(world.getTopY(), center.getY() + SEARCH_RADIUS);
-        int minZ = center.getZ() - SEARCH_RADIUS;
-        int maxZ = center.getZ() + SEARCH_RADIUS;
-
-        for (int x = minX; x <= maxX; x += 1) {
-            for (int y = minY; y <= maxY; y += 1) {
-                for (int z = minZ; z <= maxZ; z += 1) {
-                    BlockPos pos = new BlockPos(x, y, z);
-                    if (world.getBlockState(pos).getBlock() == Blocks.DRAGON_EGG) {
-                        found.add(pos);
+        BlockPos.Mutable pos = new BlockPos.Mutable();
+        for (int x = minX; x <= maxX; x++) {
+            for (int z = minZ; z <= maxZ; z++) {
+                int topY = Math.min(maxY, world.getTopY(Heightmap.Type.WORLD_SURFACE, x, z));
+                for (int y = minY; y <= topY; y++) {
+                    pos.set(x, y, z);
+                    BlockState state = world.getBlockState(pos);
+                    if (state.isOf(Blocks.DRAGON_EGG)) {
+                        drawBoxOutline(matrices, buffer, pos, 1.0f, 0.2f, 1.0f, 1.0f);
                     }
                 }
             }
         }
-        return found;
+
+        matrices.pop();
+        consumers.draw(RenderLayer.getLines());
     }
 
-    // Draw wireframe box edges
-    private static void drawBox(BufferBuilder buf, Matrix4f mat,
-                                 float x1, float y1, float z1,
-                                 float x2, float y2, float z2,
-                                 float r, float g, float b, float a) {
-        // Bottom face
-        buf.vertex(mat, x1, y1, z1).color(r, g, b, a);
-        buf.vertex(mat, x2, y1, z1).color(r, g, b, a);
-        buf.vertex(mat, x2, y1, z1).color(r, g, b, a);
-        buf.vertex(mat, x2, y1, z2).color(r, g, b, a);
-        buf.vertex(mat, x2, y1, z2).color(r, g, b, a);
-        buf.vertex(mat, x1, y1, z2).color(r, g, b, a);
-        buf.vertex(mat, x1, y1, z2).color(r, g, b, a);
-        buf.vertex(mat, x1, y1, z1).color(r, g, b, a);
+    private static void drawBoxOutline(
+            MatrixStack matrices,
+            VertexConsumer consumer,
+            BlockPos pos,
+            float red,
+            float green,
+            float blue,
+            float alpha
+    ) {
+        Box box = new Box(pos);
+        MatrixStack.Entry entry = matrices.peek();
 
-        // Top face
-        buf.vertex(mat, x1, y2, z1).color(r, g, b, a);
-        buf.vertex(mat, x2, y2, z1).color(r, g, b, a);
-        buf.vertex(mat, x2, y2, z1).color(r, g, b, a);
-        buf.vertex(mat, x2, y2, z2).color(r, g, b, a);
-        buf.vertex(mat, x2, y2, z2).color(r, g, b, a);
-        buf.vertex(mat, x1, y2, z2).color(r, g, b, a);
-        buf.vertex(mat, x1, y2, z2).color(r, g, b, a);
-        buf.vertex(mat, x1, y2, z1).color(r, g, b, a);
+        double minX = box.minX;
+        double minY = box.minY;
+        double minZ = box.minZ;
+        double maxX = box.maxX;
+        double maxY = box.maxY;
+        double maxZ = box.maxZ;
 
-        // Vertical edges
-        buf.vertex(mat, x1, y1, z1).color(r, g, b, a);
-        buf.vertex(mat, x1, y2, z1).color(r, g, b, a);
-        buf.vertex(mat, x2, y1, z1).color(r, g, b, a);
-        buf.vertex(mat, x2, y2, z1).color(r, g, b, a);
-        buf.vertex(mat, x2, y1, z2).color(r, g, b, a);
-        buf.vertex(mat, x2, y2, z2).color(r, g, b, a);
-        buf.vertex(mat, x1, y1, z2).color(r, g, b, a);
-        buf.vertex(mat, x1, y2, z2).color(r, g, b, a);
+        // Bottom 4 edges
+        line(entry, consumer, minX, minY, minZ, maxX, minY, minZ, red, green, blue, alpha);
+        line(entry, consumer, maxX, minY, minZ, maxX, minY, maxZ, red, green, blue, alpha);
+        line(entry, consumer, maxX, minY, maxZ, minX, minY, maxZ, red, green, blue, alpha);
+        line(entry, consumer, minX, minY, maxZ, minX, minY, minZ, red, green, blue, alpha);
+
+        // Top 4 edges
+        line(entry, consumer, minX, maxY, minZ, maxX, maxY, minZ, red, green, blue, alpha);
+        line(entry, consumer, maxX, maxY, minZ, maxX, maxY, maxZ, red, green, blue, alpha);
+        line(entry, consumer, maxX, maxY, maxZ, minX, maxY, maxZ, red, green, blue, alpha);
+        line(entry, consumer, minX, maxY, maxZ, minX, maxY, minZ, red, green, blue, alpha);
+
+        // 4 vertical edges
+        line(entry, consumer, minX, minY, minZ, minX, maxY, minZ, red, green, blue, alpha);
+        line(entry, consumer, maxX, minY, minZ, maxX, maxY, minZ, red, green, blue, alpha);
+        line(entry, consumer, maxX, minY, maxZ, maxX, maxY, maxZ, red, green, blue, alpha);
+        line(entry, consumer, minX, minY, maxZ, minX, maxY, maxZ, red, green, blue, alpha);
     }
 
-    // Draw filled box (6 faces as quads)
-    private static void drawFilledBox(BufferBuilder buf, Matrix4f mat,
-                                       float x1, float y1, float z1,
-                                       float x2, float y2, float z2,
-                                       float r, float g, float b, float a) {
-        // Bottom
-        buf.vertex(mat, x1, y1, z1).color(r, g, b, a);
-        buf.vertex(mat, x2, y1, z1).color(r, g, b, a);
-        buf.vertex(mat, x2, y1, z2).color(r, g, b, a);
-        buf.vertex(mat, x1, y1, z2).color(r, g, b, a);
-        // Top
-        buf.vertex(mat, x1, y2, z1).color(r, g, b, a);
-        buf.vertex(mat, x1, y2, z2).color(r, g, b, a);
-        buf.vertex(mat, x2, y2, z2).color(r, g, b, a);
-        buf.vertex(mat, x2, y2, z1).color(r, g, b, a);
-        // North (z1)
-        buf.vertex(mat, x1, y1, z1).color(r, g, b, a);
-        buf.vertex(mat, x1, y2, z1).color(r, g, b, a);
-        buf.vertex(mat, x2, y2, z1).color(r, g, b, a);
-        buf.vertex(mat, x2, y1, z1).color(r, g, b, a);
-        // South (z2)
-        buf.vertex(mat, x1, y1, z2).color(r, g, b, a);
-        buf.vertex(mat, x2, y1, z2).color(r, g, b, a);
-        buf.vertex(mat, x2, y2, z2).color(r, g, b, a);
-        buf.vertex(mat, x1, y2, z2).color(r, g, b, a);
-        // West (x1)
-        buf.vertex(mat, x1, y1, z1).color(r, g, b, a);
-        buf.vertex(mat, x1, y1, z2).color(r, g, b, a);
-        buf.vertex(mat, x1, y2, z2).color(r, g, b, a);
-        buf.vertex(mat, x1, y2, z1).color(r, g, b, a);
-        // East (x2)
-        buf.vertex(mat, x2, y1, z1).color(r, g, b, a);
-        buf.vertex(mat, x2, y2, z1).color(r, g, b, a);
-        buf.vertex(mat, x2, y2, z2).color(r, g, b, a);
-        buf.vertex(mat, x2, y1, z2).color(r, g, b, a);
+    private static void line(
+            MatrixStack.Entry entry,
+            VertexConsumer consumer,
+            double x1, double y1, double z1,
+            double x2, double y2, double z2,
+            float red, float green, float blue, float alpha
+    ) {
+        float dx = (float) (x2 - x1);
+        float dy = (float) (y2 - y1);
+        float dz = (float) (z2 - z1);
+        float len = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+        float nx = len > 0 ? dx / len : 0f;
+        float ny = len > 0 ? dy / len : 1f;
+        float nz = len > 0 ? dz / len : 0f;
+
+        consumer.vertex(entry, (float) x1, (float) y1, (float) z1)
+                .color(red, green, blue, alpha)
+                .normal(entry, nx, ny, nz);
+        consumer.vertex(entry, (float) x2, (float) y2, (float) z2)
+                .color(red, green, blue, alpha)
+                .normal(entry, nx, ny, nz);
     }
 }
