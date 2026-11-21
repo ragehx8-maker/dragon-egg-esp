@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "dragonesp",
+  "version": "${version}",
+  "name": "Dragon Egg ESP",
+  "description": "Dragon Egg ko ESP (highlight + tracer lines) se dikhata hai",
+  "authors": ["DragonESP"],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/dragonesp/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.dragonesp.client.DragonEggESPClient"
+    ]
+  },
+  "mixins": [
+    "dragonesp.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.15.11",
+    "fabric-api": "*",
+    "minecraft": "~1.21.11",
+    "java": ">=21"
+  }
+}
