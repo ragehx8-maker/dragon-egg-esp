@@ -35,8 +35,9 @@ public class DragonEggESPRenderer {
         int minY = Math.max(world.getBottomY(), center.getY() - VERTICAL_RADIUS);
         int maxY = Math.min(world.getTopY(Heightmap.Type.WORLD_SURFACE, center.getX(), center.getZ()) + VERTICAL_RADIUS, 320);
 
+        RenderLayer layer = RenderLayer.getTranslucent();
         VertexConsumerProvider.Immediate consumers = client.getBufferBuilders().getEntityVertexConsumers();
-        VertexConsumer buffer = consumers.getBuffer(RenderLayer.getDebugQuads());
+        VertexConsumer buffer = consumers.getBuffer(layer);
 
         matrices.push();
         matrices.translate(-camPos.x, -camPos.y, -camPos.z);
@@ -56,7 +57,7 @@ public class DragonEggESPRenderer {
         }
 
         matrices.pop();
-        consumers.draw();
+        consumers.draw(layer);
     }
 
     private static void drawBoxOutline(
